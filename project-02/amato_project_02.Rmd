@@ -1,0 +1,184 @@
+---
+title: "Mini-Project 02"
+output: 
+  html_document:
+    keep_md: true
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Set-up
+In the set-up for this mini-project, the first thing is to load the various **packages** using the **library** function. The *tidyverse* package is needed for functions to read the data sets, summarizing functions for filtering/altering the data, and lastly to plot graphs using ggplot. The *sf* package is needed for reading .shp files for the spatial visualization graphs. Plotly is used for creating interactive plots with the htmlwidgets package being used for saving the plots. Lastly the broom package is used to tidy up data for a coefficients plot.
+
+```{r}
+library(tidyverse)
+library(sf)
+library(plotly)
+library(htmlwidgets)
+library(broom)
+```
+
+# Analysis and Results
+For this analysis an interactive plot, spatial visualization, and visualization were planned to be created. My original idea and game plan was to create a scatter plot for the interactive plot, do some sort of mapping of a country or state for the spatial visualization, and do a linear model for the visualization of a model plot. The most necessary step for prepping all the data for the graphs within this project was filtering out all the *NA's* within the data. The other prepping that was needed was with the visualizing a model plot which required tidying using the tidy() function and the glance() function. All the prepping and data filtering can be found below within the project analysis.
+
+### Toyota Corolla Vehicles: Interactive Plot
+Here the **"ToyotaCorolla"** data set is read and then filtered to drop all rows that contain a *NA* input so that it doesn't have an affect on the plotted data. A scatter plot is then created to show Price vs Current Mileage where the points are colored by fuel type and sized by horsepower. ggplotly is used to then turn the scatter plot into an interactive scatter plot showing the model, manufacturing year, color, and cylinders of each vehicle as shown below in the graph.
+
+The stories that can be seen within this plot is that it shows almost a linear trend between price and current mileage on the vehicle. Where the price increases as the car has a lower mileage and decreases as the car contains more miles on it. The plot also shows that the majority of vehicles use Petrol as the fuel type instead of CNG or Diesel. You can also see that there isn't a trend between price and fuel type as the same trend is shown for all three types. You do see a little bit of a trend between horsepower and price as most of the larger sized circles are located at a higher price.
+```{r}
+# Read the data
+toyota <- read.csv("../data/ToyotaCorolla.csv")
+# Filter the data to remove all rows with NA inputs
+toyota_filt <- toyota %>%
+  drop_na()
+```
+
+
+```{r}
+# Create a scatter plot of price vs. km, coloring by fuel_type and sizing by hp
+toyota_plot <- ggplot(toyota_filt) +
+  geom_point(aes(x = km, y = price,
+                 color = fuel_type, size = hp, 
+                 # Interactive information outputted in the points
+                 text = paste(
+                   "Model:", model,
+                   "<br>Year:", mfg_year,
+                   "<br>Color:", color,
+                   "<br>Cylinders:", cylinders)), alpha = 0.25) +
+  # Add labels for graph
+  labs(title = "Price in Terms of Current Mileage on the Vehicle", x = "Current Mileage", y = "Price", color = "Fuel type", size = "Horsepower") +
+  guides(color = guide_legend(title = "Fuel Type"),
+         size = guide_legend(title = "Horsepower"))
+# Use ggplotly to plot the interactive plot and use tooltip to add the text that was depicted above in the ggplot
+toyota_plotly <- ggplotly(toyota_plot, tooltip = "text")
+# Save the interactive plot as a self contained HTML version
+htmlwidgets::saveWidget(toyota_plotly, "ToyotaCorolla_plot.html")
+toyota_plotly
+```
+
+
+
+### Florida Schools: Spatial Visualization
+Here the **"Public_Private_Schools_in_Florida"** data set is read and then filtered to drop all rows that contain a *NA* input in the column **YR_BUILT** as well as "0" inputs so that it doesn't have an affect on the plotted data. Two spatial plots are then created to show school locations in Florida, with the first having the points colored by school type and the second having the points colored by the year built.
+
+The first graph shows the story between private and public schooling amount and location. It can be seen that the majority of schools are public school and that private schools tend to be located in more populated areas. The second graph shows the story that the majority of schools are built between 1950-2000 with the newest schools being located mostly in the more populated areas. The graphs also show an extremely few amount of schools built earlier than 1950's.
+```{r}
+# Read the data
+florida_schools <- st_read("../data/Public_Private_Schools_in_Florida-2017/Public_Private_Schools_in_Florida-2017/gc_schools_sep17.shp")
+# Filter the data to remove all rows with NA inputs in the column YR_BUILT as well as remove "0" inputs
+YearBuilt_filt <- florida_schools %>%
+  filter(!is.na(YR_BUILT), YR_BUILT != 0)
+```
+
+
+```{r}
+# Create a spatial plot, coloring by OP_CLASS
+ggplot(data = florida_schools) +
+  geom_sf(aes(color = OP_CLASS)) +
+  # Choose colors for the OP_CLASS variable
+  scale_color_manual(name = "School Type",
+                     values = c("PUBLIC" = "darkorchid", "PRIVATE" = "cyan3")) +
+  # Add labels for graph
+  labs(title = "Private and Public Schooling in Florida") +
+  theme_minimal()
+```
+
+
+```{r}
+# Create a spatial plot, coloring by YR_BUILT
+ggplot(data = YearBuilt_filt) +
+  geom_sf(aes(color = YR_BUILT)) +
+  # Choose gradient color type
+  scale_color_viridis_c(name = "Year Built", option = "viridis") +
+  # Add labels for graph
+  labs(title = "Years Florida Schools Were Built") +
+  theme_minimal()
+```
+
+### Toyota Corolla Vehicles: Visualization of a Model
+Here the **"ToyotaCorolla"** data set is used again for the visualization of a model aspect of the project. A linear regression model was created using price as the independent variable and current mileage as the dependent variable. A scatter plot is then created to show Price vs Current Mileage with the linear method being added using the geom_smooth() function.
+
+The story this graph depicts is a somewhat linear relationship between price and current mileage on the vehicle.
+```{r}
+# Create a linear regression model of price vs km
+toyota_viz <- lm(price ~ km, data = toyota_filt)
+
+# Create a scatter plot of price vs km
+ggplot(toyota_filt, aes(x = km, y = price)) +
+  geom_point() +
+  # Use a linear model method
+  geom_smooth(method = "lm", formula = "y ~ x") +
+  theme_minimal() +
+  # Add labels for graph
+  labs(title = "Linear Correlation Model between Vehicle Price and Current Mileage", x = "Current Mileage", y = "Price")
+```
+
+Data is then tidied up using the tidy() function in the broom package and diagnostics are returned using the glace() function. The low and high confidence intervals columns is added to the table as well
+```{r}
+# Tidy up data using the tidy() function in the broom package
+tidy(toyota_viz, conf.int = TRUE)
+```
+
+```{r}
+# Return diagnostics using the glance() function in the broom package
+glance(toyota_viz)
+```
+
+Another linear regression model was created but now adding in the variables horsepower and manufacturing year. The data is then tidied using the tidy() function and filtered to remove the intercept row as it's normally dropped/skipped. The outputted table shows the **"Bn"** coefficients (estimate column) for the respective terms as well as again the respective low and high confidence intervals. 
+
+Linear regression models use this formula: **price = B0 + Bn x *Variable_n* + err** where variables are multiplied by **"Bn"** terms with n = 1, 2, 3, etc. **"B0"** here is the y-int which is usually ignored/skipped as it will be here for this analysis as well. The full formula can be seen below with the variables current mileage, horsepower, and manufacturing year. The formula is then shown again with the respective coefficient values plugged in.
+
+price = B0 + B1 x *km* + B2 x *hp* + B3 x *mfg_year* + err
+
+price = (-0.01128) x *km* + (34.83) x *hp* + (1889.195) x *mfg_year* + err
+
+```{r}
+# Create a linear regression model of price vs. km adding horsepower and mfg_year
+toyota_viz_comp <- lm(price ~ km + hp + mfg_year, data = toyota_filt)
+
+# Tidy up the data using the tidy() function in the broom package
+toyota_coeff <- tidy(toyota_viz_comp, conf.int = TRUE) %>%
+  # Filter the table to get rid of the intercept row
+  filter(term != "(Intercept)") # Skip plotting the intercept
+# Print the table
+toyota_coeff
+```
+
+Lastly the coefficients plot is created of the variables using their respective estimate values. A vertical line is also shown to indicate the line between low and high confidence. This graph shows that horsepower has a tiny positive effect on price while manufacturing year and an extremely large positive effect on price.
+```{r}
+# Create a coefficients plot of fct_rev(term) vs estimate
+ggplot(toyota_coeff, aes(x = estimate, y = fct_rev(term))) +
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high)) +
+  # Create a vertical line at x = 0 to show the middle line between low and high confidence
+  geom_vline(xintercept = 0, color = "purple") +
+  theme_minimal() +
+  # Add labels for graph
+  labs(title = "Price vs Mileage Coefficients Plot",x = "Estimate", y = "Variable")
+
+```
+
+```{r}
+ggplot(toyota_filt, aes(x = mfg_year, y = price)) +
+  geom_jitter() +
+  theme_minimal() +
+  # Add labels for graph
+  labs(title = "Price vs Mileage Manufacturing Year",x = "Manufacturing Year", y = "Price")
+```
+
+```{r}
+ggplot(toyota_filt, aes(x = hp, y = price)) +
+  geom_jitter() +
+  theme_minimal() +
+  # Add labels for graph
+  labs(title = "Price vs Mileage Horsepower",x = "Horsepower", y = "Price")
+```
+
+
+# Conclusions
+Within this project many principles of data visualizations were used such as **data filtering, tidying, and prepping**, **coloring and aesthetics**, and **simplicity**. The data sets required filtering to remove unwanted inputs such as *NA's* as well as tidying and prepping for the coefficient's plot in the visualization of a model aspect of the project. Appropriate and  sensible coloring and aesthetics where chosen for the various graphs to keep things consistent, easy to visualize, and aesthetically pleasing to the eye. The graphs were also kept simple making sure too much was not happening on the graph at once. Lastly in the interactive plot lots of information was able to be plotted using the tooltip text so that hovering over the points could show you extra relevant data without taking away from the base data plotted.
+
+Many small difficulties and road bumps were encountered during this project with the majority being **knowledge of code function names and purpose** and **choosing an appropriate data set**. As a mechanical engineering I do not have a lot of coding language knowledge and I have briefly learned a lot of other coding languages such as C+, C++, Python, and MATLAB. Therefore, learning yet another coding language briefly in such a short time period is a lot to take in and I need constant reminding of what the function names for things are or what they do again. The basic functions were fairly easy to pick up and remember but as we got to more complex graph and therefore more various function names they start to get jumbled up. This caused a lot of trial and error while writing the code and lots of referencing code function names from the slides, notes, and online. A lot of the time for this project was also spent just looking at various data sets, testing some out to see if I liked the data or the results it was showing for the graphs that were required. Personally it took awhile for each graph type before I found a data set I liked and outputted a nice graph for what I was going for.
